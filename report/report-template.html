@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title></title>
+  
+    <!-- Google Font: Source Sans Pro -->
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Source+Sans+Pro:300,400,400i,700&display=fallback">
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="../AdminLTE/plugins/fontawesome-free/css/all.min.css">
+    <!-- Theme style -->
+    <link rel="stylesheet" href="../AdminLTE/dist/css/adminlte.min.css">
+  
+  </head>
+  <body class="hold-transition sidebar-mini layout-fixed" style="background-color: #f4f6f9;">
+    <div class="wrapper">
+
+      <div class="row">
+        <div class="col-sm-12 col-md-8">
+          <div class="container">
+            <!-- topNavigation -->
+            <section class="content-header">
+              <div class="container-fluid">
+                <div class="row mb-2">
+                  <div class="col-sm-12">
+                    <ol id="topNavigation" class="breadcrumb float-sm-left"></ol>
+                  </div>
+                </div>
+              </div>
+            </section>
+            <!-- /.topNavigation -->
+            <!-- Info & Test -->
+            <section class="content">
+              <div class="container-fluid">
+                <div class="row">
+                  <!-- Info -->
+                  <div class="col-12">
+                    <div class="card card-default">
+                      <div class="card-header">
+                        <h3 class="card-title">
+                          <i class="fas fa-globe"></i>
+                          General
+                        </h3>
+                      </div>
+                      <div class="card-body">
+                        <div class="row">
+                          <div class="col-md-6 col-lg-3">
+                            <span class="mb-1">Start time</span>
+                            <p id="startTime" class="text-muted"></p>
+                            
+                            <span class="mb-1">Total duration</span>
+                            <p id="totalDuration" class="text-muted"></p>
+
+                            <span class="mb-1">Executed by</span>
+                            <p id="executedBy" class="text-muted"></p>
+                          </div>
+                          <div class="col-md-6 col-lg-3">
+                              <span class="mb-1">Driver</span>
+                              <p id="driver" class="text-muted"></p>
+        
+                              <span class="mb-1">Total tests</span>
+                              <p id="totalTest" class="text-muted"></p>
+                          </div>
+                          <div class="col-md-12 col-lg-6">
+                            <canvas id="donutChart" style="min-height: 250px; height: 250px; max-height: 250px; max-width: 100%;"></canvas>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <!-- /.Info -->
+                  <!-- Test -->
+                  <div class="col-12">
+                    <div class="card card-default">
+                      <div class="card-body p-0">
+                        <table class="table">
+                          <thead>
+                            <tr>
+                              <th style="width: 60%;">Test Name</th>
+                              <th>Duration</th>
+                              <th>Status</th>
+                            </tr>
+                          </thead>
+                          <tbody id="tableTest"></tbody>
+                        </table>
+                      </div>
+                    </div>
+                  </div>
+                  <!-- /.Test -->
+                </div>
+              </div>
+            </section>
+            <!-- /.Info & Test -->
+          </div>
+        </div>
+        <!-- Test Events -->
+        <div class="col-sm-12 col-md-4">
+            <div class="card card-default">
+              <div class="card-body p-0">
+                <table class="table">
+                  <thead>
+                    <tr>
+                      <th id="testName">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody id="tableTestEvent"></tbody>
+                </table>
+              </div>
+            </div>
+        </div>
+        <!-- /.Test Events -->
+      </div>
+       
+    </div>
+
+  <!-- jQuery -->
+  <script src="../AdminLTE/plugins/jquery/jquery.min.js"></script>
+  <!-- jQuery UI 1.11.4 -->
+  <script src="../AdminLTE/plugins/jquery-ui/jquery-ui.min.js"></script>
+  <!-- Resolve conflict in jQuery UI tooltip with Bootstrap tooltip -->
+  <script>
+    $.widget.bridge('uibutton', $.ui.button)
+  </script>
+  <!-- Bootstrap 4 -->
+  <script src="../AdminLTE/plugins/bootstrap/js/bootstrap.bundle.min.js"></script>
+  <!-- ChartJS -->
+  <script src="../AdminLTE/plugins/chart.js/Chart.min.js"></script>
+
+  <!-- App Report -->
+  <script type="text/javascript" language="javascript" src="report-json.js"></script> 
+  <script>
+    const empty = '<div></div>';
+
+    $( document ).ready(function() {
+      setTitle(Props);
+      setTopNavigation(Props);
+      setGeneral(Props);
+      setTest(Props);
+    });
+
+    function setTitle({title}) {
+      $(document).prop('title', title);
+    }
+
+    function setTopNavigation({projectName, executionDate}) {
+      const topNavigation = $('#topNavigation');
+      const nav1 = `<li class="breadcrumb-item"><a>${projectName}</a></li>`;
+      const nav2 = `<li class="breadcrumb-item active"><a>${executionDate}</a></li>`;
+      topNavigation.append(nav1, nav2);
+    }
+
+    function setGeneral({startTime, totalDuration, executor, driver, totalTest, testPassed, testFailed}) {
+      setText('#startTime', startTime);
+      setText('#totalDuration', totalDuration);
+      setText('#executedBy', executor);
+      setText('#driver', driver);
+      setText('#totalTest', totalTest);
+      setChart({testPassed, testFailed});
+    }
+  
+    function setTest({tests}) {
+      const table = $('#tableTest');
+      tests.forEach((test, index) => {
+        const {name, duration, status} = test;
+        const statusValue = statusLabel(status);
+        const row = `
+          <tr id="test-${index}" class="callout callout-${statusValue}" style="cursor: pointer;">
+            <td>${name}</td>
+            <td>${duration}</td>
+            <td>
+              <span class="badge bg-${statusValue}">${status}</span>
+            </td>
+          </tr>`;
+        table.append(row);
+      });
+
+      $("tr[id*='test-']").on('click', ({currentTarget}) => {
+        const index = Number(`${currentTarget.id}`.split('-')[1]);
+        setTestEvent(tests[index]);
+      });
+
+      if (tests && tests.length) {
+        setTestEvent(tests[0]);
+      }
+    }
+
+    function setTestEvent({name, events}) {
+      const table = $('#tableTestEvent');
+      table.children().remove();
+      setText('#testName', name);
+      events.forEach((event, index) => {
+        const collapseId = `testevent-${index}`;
+        const statusValue = statusLabel(event.status);
+
+        const row = `
+        <tr data-toggle="collapse" href="#${collapseId}" role="button" aria-expanded="false" aria-controls="${collapseId}" class="callout callout-${statusValue}">
+          <td>
+            <h5>
+              ${index + 1}
+              <small>${event.name}</small>
+            </h5> 
+          </td>
+        </tr>
+        ${
+          event.message || event.screenShot ? `
+          <tr id="${collapseId}" class="collapse callout callout-${statusValue}">
+            <td>
+              ${eventScreenShot(event)}
+              ${eventMessage(event)}
+            </td>
+          </tr>
+          ` : null
+        }`;
+        table.append(row);
+      });
+    }
+
+    function eventScreenShot({screenShot}) {
+      return !screenShot ? empty : `
+        <div class="row">
+          <p class="text-muted">Screen Shot</p>
+        </div>
+        <div class="card card-body row">
+          <img src="${screenShot}" class="img-fluid" />
+        </div>`;
+    }
+
+    function eventMessage({message}) {
+      return !message ? empty : `
+        <div class="row">
+          <p class="text-muted">Message</p>
+        </div>
+        <div class="card card-body row">
+          <small>${message}</small>
+        </div>`;
+    }
+
+    function statusLabel(value) {
+      return ['passed', 'ok'].includes(value.toLocaleLowerCase()) ? 'success' : 'danger';
+    }
+
+    function setText(element, label) {
+      const el = $(element);
+      el.text(label);
+    }
+  
+    function setChart({testPassed, testFailed}) {
+      var donutChartCanvas = $('#donutChart').get(0).getContext('2d');
+      var donutData = {
+        labels: ['Passed', 'Failed'],
+        datasets: [
+          {
+            data: [testPassed, testFailed],
+            backgroundColor: ['#2ecc71', '#e74c3c'],
+          },
+        ],
+      };
+      var donutOptions = {
+        maintainAspectRatio: false,
+        responsive: true,
+      };
+      new Chart(donutChartCanvas, {
+        type: 'doughnut',
+        data: donutData,
+        options: donutOptions
+      });
+    }
+
+  </script>
+  
+</body>
+</html>
